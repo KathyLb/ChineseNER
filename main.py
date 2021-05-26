@@ -3,7 +3,7 @@ import os
 import codecs
 import pickle
 import itertools
-from collections import OrderedDict
+from collections import OrderedDict 
 
 import tensorflow as tf
 import numpy as np
@@ -15,9 +15,9 @@ from utils import get_logger, make_path, clean, create_model, save_model
 from utils import print_config, save_config, load_config, test_ner
 from data_utils import load_word2vec, create_input, input_from_line, BatchManager
 
-flags = tf.app.flags
+flags = tf.app.flags # 定义变量
 flags.DEFINE_boolean("clean",       False,      "clean train folder")
-flags.DEFINE_boolean("train",       False,      "Wither train the model")
+flags.DEFINE_boolean("train",       False,      "Wether train the model")
 # configurations for the model
 flags.DEFINE_integer("seg_dim",     20,         "Embedding size for segmentation, 0 if not used")
 flags.DEFINE_integer("char_dim",    100,        "Embedding size for characters")
@@ -30,9 +30,9 @@ flags.DEFINE_float("dropout",       0.5,        "Dropout rate")
 flags.DEFINE_float("batch_size",    20,         "batch size")
 flags.DEFINE_float("lr",            0.001,      "Initial learning rate")
 flags.DEFINE_string("optimizer",    "adam",     "Optimizer for training")
-flags.DEFINE_boolean("pre_emb",     True,       "Wither use pre-trained embedding")
-flags.DEFINE_boolean("zeros",       False,      "Wither replace digits with zero")
-flags.DEFINE_boolean("lower",       True,       "Wither lower case")
+flags.DEFINE_boolean("pre_emb",     True,       "Wether use pre-trained embedding")
+flags.DEFINE_boolean("zeros",       False,      "Wether replace digits with zero")
+flags.DEFINE_boolean("lower",       True,       "Wether lower case")
 
 flags.DEFINE_integer("max_epoch",   100,        "maximum training epochs")
 flags.DEFINE_integer("steps_check", 100,        "steps per checkpoint")
@@ -50,7 +50,9 @@ flags.DEFINE_string("dev_file",     os.path.join("data", "example.dev"),    "Pat
 flags.DEFINE_string("test_file",    os.path.join("data", "example.test"),   "Path for test data")
 
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = tf.app.flags.FLAGS # 用命令执行程序时传参用
+
+# 检查条件，不符合就终止程序
 assert FLAGS.clip < 5.1, "gradient clip should't be too much"
 assert 0 <= FLAGS.dropout < 1, "dropout rate between 0 and 1"
 assert FLAGS.lr > 0, "learning rate must larger than zero"
@@ -59,7 +61,7 @@ assert FLAGS.optimizer in ["adam", "sgd", "adagrad"]
 
 # config for the model
 def config_model(char_to_id, tag_to_id):
-    config = OrderedDict()
+    config = OrderedDict() # 定义有序字典
     config["num_chars"] = len(char_to_id)
     config["char_dim"] = FLAGS.char_dim
     config["num_tags"] = len(tag_to_id)
@@ -81,8 +83,8 @@ def config_model(char_to_id, tag_to_id):
 
 def evaluate(sess, model, name, data, id_to_tag, logger):
     logger.info("evaluate:{}".format(name))
-    ner_results = model.evaluate(sess, data, id_to_tag)
-    eval_lines = test_ner(ner_results, FLAGS.result_path)
+    ner_results = model.evaluate(sess, data, id_to_tag) # model.Model.evaluate
+    eval_lines = test_ner(ner_results, FLAGS.result_path) # utils.test_ner
     for line in eval_lines:
         logger.info(line)
     f1 = float(eval_lines[1].strip().split()[-1])
@@ -90,6 +92,7 @@ def evaluate(sess, model, name, data, id_to_tag, logger):
     if name == "dev":
         best_test_f1 = model.best_dev_f1.eval()
         if f1 > best_test_f1:
+            # 将f1赋值给莫得了。best_dev_f1
             tf.assign(model.best_dev_f1, f1).eval()
             logger.info("new best dev f1 score:{:>.3f}".format(f1))
         return f1 > best_test_f1
@@ -222,7 +225,7 @@ def main(_):
 
 
 if __name__ == "__main__":
-    tf.app.run(main)
+    tf.app.run(main) # 致性程序中的main函数，并解析命令行参数
 
 
 

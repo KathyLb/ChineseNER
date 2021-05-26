@@ -70,7 +70,7 @@ def evaluate(iterable, options=None):
     last_correct_type = ''    # type of previously identified chunk tag
     last_guessed = 'O'        # previously identified chunk tag
     last_guessed_type = ''    # type of previous chunk tag in corpus
-
+    print(iterable)
     for line in iterable:
         line = line.rstrip('\r\n')
 
