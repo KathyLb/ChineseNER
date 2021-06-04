@@ -100,10 +100,10 @@ def clean(params):
         os.remove(params.map_file)
 
     if os.path.isdir(params.ckpt_path):
-        shutil.rmtree(params.ckpt_path)
+        shutil.rmtree(params.ckpt_path) # 递归删除文件夹目录下内容
 
     if os.path.isdir(params.summary_path):
-        shutil.rmtree(params.summary_path)
+        shutil.rmtree(params.summary_path) 
 
     if os.path.isdir(params.result_path):
         shutil.rmtree(params.result_path)

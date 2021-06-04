@@ -26,6 +26,7 @@ class Model(object):
         self.global_step = tf.Variable(0, trainable=False)
         self.best_dev_f1 = tf.Variable(0.0, trainable=False)
         self.best_test_f1 = tf.Variable(0.0, trainable=False)
+        # 初始化权重矩阵，用来保持每一层的梯度大小都差不多相同
         self.initializer = initializers.xavier_initializer()
 
         # add placeholders for the model
@@ -43,9 +44,12 @@ class Model(object):
         # dropout keep prob
         self.dropout = tf.placeholder(dtype=tf.float32,
                                       name="Dropout")
-
+        
+        # 指示函数【-1，0，1】
         used = tf.sign(tf.abs(self.char_inputs))
+        # 删除列，每行求和
         length = tf.reduce_sum(used, reduction_indices=1)
+        # 将参数length数据类型转换为int32
         self.lengths = tf.cast(length, tf.int32)
         self.batch_size = tf.shape(self.char_inputs)[0]
         self.num_steps = tf.shape(self.char_inputs)[-1]
@@ -54,6 +58,7 @@ class Model(object):
         embedding = self.embedding_layer(self.char_inputs, self.seg_inputs, config)
 
         # apply dropout before feed to lstm layer
+        # 防止或减轻过拟合，一般用在全连接层，在训练过程中随机扔掉一部分神经元，即概率激活，权重保留暂时不更新
         lstm_inputs = tf.nn.dropout(embedding, self.dropout)
 
         # bi-directional lstm layer
@@ -91,14 +96,21 @@ class Model(object):
         :param seg_inputs: segmentation feature
         :param config: wither use segmentation feature
         :return: [1, num_steps, embedding size], 
+            ??? num_steps=char_inputs.shape=seg_inputs.shape
+            ??? embedding_size=char_dim+seg_dim
+            ??? 1=biLSTM_layer input batch_size
         """
 
         embedding = []
+        # tf.variable_scope()和tf.get_variable()是配合使用的，主要用于共享变量
+        # tf.name_scope()对tf.get_variable()不起作用，tf.get_variable()必须和tf.variable_scope()配合使用
+        
         with tf.variable_scope("char_embedding" if not name else name), tf.device('/cpu:0'):
             self.char_lookup = tf.get_variable(
                     name="char_embedding",
                     shape=[self.num_chars, self.char_dim],
                     initializer=self.initializer)
+            # 按找char_inputs从self.char_lookup中拿向量（行）
             embedding.append(tf.nn.embedding_lookup(self.char_lookup, char_inputs))
             if config["seg_dim"]:
                 with tf.variable_scope("seg_embedding"), tf.device('/cpu:0'):
@@ -107,6 +119,7 @@ class Model(object):
                         shape=[self.num_segs, self.seg_dim],
                         initializer=self.initializer)
                     embedding.append(tf.nn.embedding_lookup(self.seg_lookup, seg_inputs))
+            # 倒数第一维度增加
             embed = tf.concat(embedding, axis=-1)
         return embed
 
@@ -119,23 +132,26 @@ class Model(object):
             lstm_cell = {}
             for direction in ["forward", "backward"]:
                 with tf.variable_scope(direction):
+                    # CoupledInputForgetGateLSTMCell- LSTMCell基于LSTM：搜索空间奥德赛的输入和忘记门的扩展。
                     lstm_cell[direction] = rnn.CoupledInputForgetGateLSTMCell(
                         lstm_dim,
                         use_peepholes=True,
                         initializer=self.initializer,
                         state_is_tuple=True)
+            # outputs包含前向cell输出tensor和后向cell输出tensor
             outputs, final_states = tf.nn.bidirectional_dynamic_rnn(
                 lstm_cell["forward"],
                 lstm_cell["backward"],
                 lstm_inputs,
                 dtype=tf.float32,
                 sequence_length=lengths)
-        return tf.concat(outputs, axis=2)
+        return tf.concat(outputs, axis=2) # 拼接
 
     def project_layer(self, lstm_outputs, name=None):
         """
         hidden layer between lstm layer and logits
         :param lstm_outputs: [batch_size, num_steps, emb_size] 
+                             ??? emb_size ?= 2*lstm_dim
         :return: [batch_size, num_steps, num_tags]
         """
         with tf.variable_scope("project"  if not name else name):
@@ -145,8 +161,11 @@ class Model(object):
 
                 b = tf.get_variable("b", shape=[self.lstm_dim], dtype=tf.float32,
                                     initializer=tf.zeros_initializer())
+                # -1: 行数未知，通过元素总数量 / (self.lstm_dim*2) 计算得到
                 output = tf.reshape(lstm_outputs, shape=[-1, self.lstm_dim*2])
+                # [batch_size * num_steps, lstm_dim]
                 hidden = tf.tanh(tf.nn.xw_plus_b(output, W, b))
+                
 
             # project to score of tags
             with tf.variable_scope("logits"):

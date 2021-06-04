@@ -10,12 +10,18 @@ def load_sentences(path, lower, zeros):
     """
     Load sentences. A line must contain at least a word and its tag.
     Sentences are separated by empty lines.
+    
+    output:
+        [[['啊', 'O'], ['小', 'B-PER'], ['明', 'E-PER']], [], []]
     """
     sentences = []
     sentence = []
     num = 0
     for line in codecs.open(path, 'r', 'utf8'):
+        print(line)
         num+=1
+        # .rstrip() 删除字符产末尾空格
+        # 用0代替数字（正则表达式）
         line = zero_digits(line.rstrip()) if zeros else line.rstrip()
         # print(list(line))
         if not line:
@@ -55,7 +61,7 @@ def update_tag_scheme(sentences, tag_scheme):
             for word, new_tag in zip(s, tags):
                 word[-1] = new_tag
         elif tag_scheme == 'iobes':
-            new_tags = iob_iobes(tags)
+            new_tags = iob_iobes(tags) # 后面无I的S替换为S，后面无I的I替换为E
             for word, new_tag in zip(s, new_tags):
                 word[-1] = new_tag
         else:
@@ -66,10 +72,16 @@ def char_mapping(sentences, lower):
     """
     Create a dictionary and a mapping of words, sorted by frequency.
     """
+    # 汇总文本内所有字符
     chars = [[x[0].lower() if lower else x[0] for x in s] for s in sentences]
+    # 制作字典，key为字符，value为字符出现频次：{'爱': 1, '斯': 8}
     dico = create_dico(chars)
+    # 增加俩个特殊字符，及对应值
     dico["<PAD>"] = 10000001
     dico['<UNK>'] = 10000000
+    # 字典制作规则：频次从大到小排序（大小相同按字符顺序）序号作为id
+    # char_to_id: {'a': 1, 'd': 2, ....}
+    # id_to_char: {1: 'a', 2: 'd', ....}
     char_to_id, id_to_char = create_mapping(dico)
     print("Found %i unique words (%i in total)" % (
         len(dico), sum(len(x) for x in chars)
@@ -102,14 +114,19 @@ def prepare_dataset(sentences, char_to_id, tag_to_id, lower=False, train=True):
         return x.lower() if lower else x
     data = []
     for s in sentences:
-        string = [w[0] for w in s]
+        string = [w[0] for w in s] # 句中所有字符
         chars = [char_to_id[f(w) if f(w) in char_to_id else '<UNK>']
-                 for w in string]
-        segs = get_seg_features("".join(string))
+                 for w in string] # 字符所对应的字典id
+        # 将字符拼接成句子，进行jieba分词，对每个词的字符进行特征标记
+        # 单字=0，多字首字=1，多字尾字=3，多字中间=2
+        segs = get_seg_features("".join(string)) 
+        # 将训练集的字符标签进行id映射
+        # 非训练集则全部将字符标签等价为O，进行id映射
         if train:
             tags = [tag_to_id[w[-1]] for w in s]
         else:
             tags = [none_index for _ in chars]
+        # 句，句字符id映射，句分词后词中字符标签数字映射，字符标签id映射
         data.append([string, chars, segs, tags])
 
     return data

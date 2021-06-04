@@ -17,7 +17,7 @@ from data_utils import load_word2vec, create_input, input_from_line, BatchManage
 
 flags = tf.app.flags # 定义变量
 flags.DEFINE_boolean("clean",       False,      "clean train folder")
-flags.DEFINE_boolean("train",       False,      "Wether train the model")
+flags.DEFINE_boolean("train",       False,      "Whether train the model")
 # configurations for the model
 flags.DEFINE_integer("seg_dim",     20,         "Embedding size for segmentation, 0 if not used")
 flags.DEFINE_integer("char_dim",    100,        "Embedding size for characters")
@@ -30,9 +30,9 @@ flags.DEFINE_float("dropout",       0.5,        "Dropout rate")
 flags.DEFINE_float("batch_size",    20,         "batch size")
 flags.DEFINE_float("lr",            0.001,      "Initial learning rate")
 flags.DEFINE_string("optimizer",    "adam",     "Optimizer for training")
-flags.DEFINE_boolean("pre_emb",     True,       "Wether use pre-trained embedding")
-flags.DEFINE_boolean("zeros",       False,      "Wether replace digits with zero")
-flags.DEFINE_boolean("lower",       True,       "Wether lower case")
+flags.DEFINE_boolean("pre_emb",     True,       "Whether use pre-trained embedding")
+flags.DEFINE_boolean("zeros",       False,      "Whether replace digits with zero")
+flags.DEFINE_boolean("lower",       True,       "Whether lower case")
 
 flags.DEFINE_integer("max_epoch",   100,        "maximum training epochs")
 flags.DEFINE_integer("steps_check", 100,        "steps per checkpoint")
@@ -106,19 +106,27 @@ def evaluate(sess, model, name, data, id_to_tag, logger):
 
 def train():
     # load data sets
+    # 将标记文件分句，分字和标签【【【啊，O】，【小，S-PER】，【明，E-PER】】，【】，】
     train_sentences = load_sentences(FLAGS.train_file, FLAGS.lower, FLAGS.zeros)
     dev_sentences = load_sentences(FLAGS.dev_file, FLAGS.lower, FLAGS.zeros)
     test_sentences = load_sentences(FLAGS.test_file, FLAGS.lower, FLAGS.zeros)
 
     # Use selected tagging scheme (IOB / IOBES)
+    # 调整train_sentences/test_sentences的标注方式，数据结构不变
     update_tag_scheme(train_sentences, FLAGS.tag_schema)
     update_tag_scheme(test_sentences, FLAGS.tag_schema)
 
     # create maps if not exist
     if not os.path.isfile(FLAGS.map_file):
         # create dictionary for word
+        # 是否使用预训练的embedding，默认True
         if FLAGS.pre_emb:
+            # 训练集形成的字典
             dico_chars_train = char_mapping(train_sentences, FLAGS.lower)[0]
+            # 如果有预训练embedding，对测试集文本内字符进行如下操作：
+            # 如果文本为空，则把不在字典里的预训练字符增补进字典，值定义为0；
+            # 如果文本不为空，则对于不在字典种但在预训练集合衷地字符增补进字典，值定义为0；
+            # 对新的字典进行重新排序，定义id
             dico_chars, char_to_id, id_to_char = augment_with_pretrained(
                 dico_chars_train.copy(),
                 FLAGS.emb_file,
@@ -130,6 +138,7 @@ def train():
             _c, char_to_id, id_to_char = char_mapping(train_sentences, FLAGS.lower)
 
         # Create a dictionary and a mapping for tags
+        # 与char_mapping相同原理，将tag做成字典
         _t, tag_to_id, id_to_tag = tag_mapping(train_sentences)
         with open(FLAGS.map_file, "wb") as f:
             pickle.dump([char_to_id, id_to_char, tag_to_id, id_to_tag], f)
@@ -138,6 +147,7 @@ def train():
             char_to_id, id_to_char, tag_to_id, id_to_tag = pickle.load(f)
 
     # prepare data, get a collection of list containing index
+    # train_data: 句，句字符id映射，句分词后字符标签数字映射，字符标签id映射
     train_data = prepare_dataset(
         train_sentences, char_to_id, tag_to_id, FLAGS.lower
     )
@@ -167,9 +177,12 @@ def train():
     print_config(config, logger)
 
     # limit GPU memory
+    # 配置tf.Session的运算方式，比如gpu运算或cpu运算
     tf_config = tf.ConfigProto()
+    # 使用allow_growth option，刚一开始分配少量的GPU容量，然后按需慢慢的增加，由于不会释放
+    # 内存，所以会导致碎片
     tf_config.gpu_options.allow_growth = True
-    steps_per_epoch = train_manager.len_data
+    steps_per_epoch = train_manager.len_data # 计算一个epoch有几个batch
     with tf.Session(config=tf_config) as sess:
         model = create_model(sess, Model, FLAGS.ckpt_path, load_word2vec, config, id_to_char, logger)
         logger.info("start training")
@@ -218,7 +231,7 @@ def main(_):
 
     if FLAGS.train:
         if FLAGS.clean:
-            clean(FLAGS)
+            clean(FLAGS) # 删除所有中间文件
         train()
     else:
         evaluate_line()

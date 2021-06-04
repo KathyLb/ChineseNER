@@ -29,6 +29,7 @@ def create_mapping(dico):
     Create a mapping (item to ID / ID to item) from a dictionary.
     Items are ordered by decreasing frequency.
     """
+    # 先按-value从小到大排序，如果value相同再按key从小到大排序
     sorted_items = sorted(dico.items(), key=lambda x: (-x[1], x[0]))
     id_to_item = {i: v[0] for i, v in enumerate(sorted_items)}
     item_to_id = {v: k for k, v in id_to_item.items()}
